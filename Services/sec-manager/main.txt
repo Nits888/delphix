@@ -15,6 +15,37 @@ limiter = Limiter(app, key_func=get_remote_address)
 # Initialize the logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Function to initialize secrets from the database and create JSON files upon startup
+def initialize_secrets():
+    try:
+        with connection_pool.getconn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT secret_id, bucket_name, secret_value FROM secrets;")
+                secrets = cursor.fetchall()
+
+        for secret in secrets:
+            secret_id = secret['secret_id']
+            bucket_name = secret['bucket_name']
+            secret_value = decrypt_secret(secret['secret_value'], ENCRYPTION_KEY)
+
+            # Create a dictionary for each secret with the secret_id as the key
+            secret_data = {
+                'secret_id': secret_id,
+                'bucket_name': bucket_name,
+                'secret': secret_value
+            }
+
+            # Create a JSON file for the secret
+            file_path = os.path.join('secrets', bucket_name, f'secret_{secret_id}.json')
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w') as json_file:
+                json.dump(secret_data, json_file)
+
+        logging.info("Initialized secrets from the database.")
+    except Exception as e:
+        logging.error("Error initializing secrets: %s", e)
+
+
 # Load configuration from config.json
 def load_config():
     try:
