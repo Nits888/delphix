@@ -1,0 +1,12 @@
+{
+  "whitelist": [
+    {
+      "hostname": "example.com",
+      "process_name": "app1"
+    },
+    {
+      "hostname": "example.net",
+      "process_name": "app2"
+    }
+  ]
+}
