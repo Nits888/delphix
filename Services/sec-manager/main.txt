@@ -141,23 +141,34 @@ def create_secret():
         # Check if the request is whitelisted
         config = load_config()
         if is_whitelisted(request.host, data.get('process_name'), bucket_name, config):
-            if store_secret_in_database(secret_id, bucket_name, encrypted_secret):
-                # Create a dictionary for the new secret
-                secret_data = {
-                    'secret_id': secret_id,
-                    'bucket_name': bucket_name,
-                    'secret': secret_value
-                }
+            with connection_pool.getconn() as conn:
+                with conn.cursor() as cursor:
+                    # Check for duplicate secret_id and bucket_name combination in the database
+                    cursor.execute("SELECT COUNT(*) FROM secrets WHERE secret_id = %s AND bucket_name = %s;",
+                                   (secret_id, bucket_name))
+                    count = cursor.fetchone()[0]
+                    if count > 0:
+                        return jsonify(error="Duplicate secret_id and bucket_name combination"), 400
 
-                # Create a JSON file for the new secret
-                file_path = os.path.join('secrets', bucket_name, f'secret_{secret_id}.json')
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                with open(file_path, 'w') as json_file:
-                    json.dump(secret_data, json_file)
+                    # Store the secret in the database
+                    cursor.execute("INSERT INTO secrets (secret_id, bucket_name, secret_value) VALUES (%s, %s, %s);",
+                                   (secret_id, bucket_name, encrypted_secret))
+                conn.commit()
 
-                return jsonify(message="Secret created successfully")
-            else:
-                return jsonify(error="Failed to create secret"), 500
+            # Create a dictionary for the new secret
+            secret_data = {
+                'secret_id': secret_id,
+                'bucket_name': bucket_name,
+                'secret': secret_value
+            }
+
+            # Create a JSON file for the new secret
+            file_path = os.path.join('secrets', bucket_name, f'secret_{secret_id}.json')
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w') as json_file:
+                json.dump(secret_data, json_file)
+
+            return jsonify(message="Secret created successfully")
         else:
             return jsonify(error="Request not whitelisted"), 403
     except Exception as e:
