@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify
 from waitress import serve
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import jsonschema
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -14,6 +15,27 @@ limiter = Limiter(app, key_func=get_remote_address)
 
 # Initialize the logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# JSON Schema for the configuration file
+CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "whitelist": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "hostname": {"type": "string"},
+                    "process_name": {"type": "string"},
+                    "bucket_name": {"type": "string"}
+                },
+                "required": ["hostname", "process_name", "bucket_name"]
+            }
+        }
+    },
+    "required": ["whitelist"]
+}
+
 
 # Function to initialize secrets from the database and create JSON files upon startup
 def initialize_secrets():
@@ -50,9 +72,12 @@ def initialize_secrets():
 def load_config():
     try:
         with open('config.json', 'r') as config_file:
-            return json.load(config_file)
+            config = json.load(config_file)
+            # Validate the configuration file against the JSON Schema
+            jsonschema.validate(config, CONFIG_SCHEMA)
+            return config
     except Exception as e:
-        logging.error("Error loading configuration: %s", e)
+        logging.error("Error loading or validating configuration: %s", e)
         return None
 
 # Database connection pooling
