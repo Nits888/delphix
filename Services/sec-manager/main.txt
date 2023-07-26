@@ -278,7 +278,7 @@ if __name__ == '__main__':
         config = load_config()
 
         # Use Waitress to serve the Flask app
-        serve(app, host='0.0.0.0', port=8000)
+        serve(app, host='127.0.0.1', port=7443, threads=4, url_scheme='https', certfile='path/to/localhost.crt', keyfile='path/to/localhost.key')
     except Exception as e:
         logging.error("An error occurred: %s", e)
     finally:
