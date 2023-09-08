@@ -154,3 +154,84 @@ def display_dashboard(env):
 ```
 
 This code structure allows you to run your Flask application with an integrated certificate manager and dashboard while maintaining modularity and separation of concerns.
+
+Certainly, let's enhance the dashboard further with additional styling and features. Below is an improved version of the dashboard template that includes more styling, responsive design, and interactivity.
+
+**dashboard.html** (Enhanced Dashboard Template):
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Manager Dashboard</title>
+    <!-- Include Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-4">Certificate Manager Dashboard - {{ env }}</h1>
+        
+        <!-- Responsive table with striped rows -->
+        <div class="table-responsive mt-4">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Issuer</th>
+                        <th>Expiry Date</th>
+                        <th>Days Until Expiry</th>
+                        <th>DNS Aliases</th>
+                        <th>FQDNs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cert_name, cert_info in certs.items() %}
+                    <tr>
+                        <td>{{ cert_name }}</td>
+                        <td>{{ cert_info.issuer_name }}</td>
+                        <td>{{ cert_info.expiry_date }}</td>
+                        <td class="{% if cert_info.days_until_expiry <= 30 %}text-danger{% elif cert_info.days_until_expiry <= 90 %}text-warning{% endif %}">
+                            {{ cert_info.days_until_expiry }}
+                        </td>
+                        <td>
+                            <ul>
+                                {% for alias in cert_info.dns_aliases %}
+                                <li>{{ alias }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                {% for fqdn in cert_info.fqdns %}
+                                <li>{{ fqdn }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Include Bootstrap JS (optional) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+```
+
+In this enhanced version of the dashboard template:
+
+- We've added more Bootstrap classes for responsiveness and styling.
+- Certificate rows with fewer than 30 days until expiry are displayed in red, and those with fewer than 90 days until expiry are displayed in orange.
+- The table is now wrapped in a `div` with the class `table-responsive`, ensuring it's scrollable on smaller screens.
+- The headers are sticky, making it easier to view data in long lists.
+- The design has been improved with more spacing and visual hierarchy.
+
+This template provides a more polished and user-friendly dashboard for displaying certificate information. You can further customize it to match your project's branding and design preferences.
