@@ -1,0 +1,52 @@
+Certainly! Here's an updated Python script that checks SSL certificate expiry with error handling, assigns a RAG (Red, Amber, Green) criteria based on the expiry date, and outputs the results to a JSON file:
+
+```python
+import ssl
+import socket
+import datetime
+import json
+
+def get_ssl_expiry_date(domain):
+    try:
+        context = ssl.create_default_context()
+        with socket.create_connection((domain, 443), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=domain) as ssock:
+                cert = ssock.getpeercert()
+                not_after_str = cert['notAfter']
+                not_after_date = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
+                return not_after_date
+    except (socket.gaierror, ConnectionRefusedError, ssl.CertificateError, TimeoutError) as e:
+        return None
+
+def assign_rag_criteria(expiry_date):
+    if expiry_date is None:
+        return "Red"  # Unable to retrieve certificate or connection error
+    today = datetime.datetime.now()
+    delta = expiry_date - today
+    if delta.days < 7:
+        return "Red"  # Certificate expires in less than 7 days
+    elif delta.days < 30:
+        return "Amber"  # Certificate expires in less than 30 days
+    else:
+        return "Green"  # Certificate expires in more than 30 days
+
+def save_to_json(data, filename):
+    with open(filename, 'w') as json_file:
+        json.dump(data, json_file, indent=4)
+
+urls = ["example.com", "google.com", "invalid.example"]  # Replace with the URLs you want to check
+results = {}
+
+for url in urls:
+    expiry_date = get_ssl_expiry_date(url)
+    rag = assign_rag_criteria(expiry_date)
+    results[url] = {"expiry_date": str(expiry_date), "rag": rag}
+
+# Output results to a JSON file
+output_filename = "ssl_expiry_results.json"
+save_to_json(results, output_filename)
+
+print(f"Results saved to {output_filename}")
+```
+
+This script defines functions for retrieving SSL certificate expiry, assigning RAG criteria, and saving results to a JSON file. It iterates through a list of URLs, handles exceptions, and stores the results in a JSON file. Adjust the `urls` list with the websites you want to check.
