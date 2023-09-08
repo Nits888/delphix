@@ -1,52 +1,156 @@
-Certainly! Here's an updated Python script that checks SSL certificate expiry with error handling, assigns a RAG (Red, Amber, Green) criteria based on the expiry date, and outputs the results to a JSON file:
+Certainly! Here are the complete Python files for your Flask application with the integrated certificate manager and dashboard:
+
+**1. `app.py` (Main Flask Application):**
 
 ```python
+from flask import Flask, render_template
+from dashboard import dashboard_bp
+import os
+import threading
+import certificate_manager
+
+app = Flask(__name__)
+
+# Start the certificate checker thread
+certificate_manager.certificate_checker_thread.start()
+
+# Define a route for the root URL
+@app.route('/')
+def index():
+    return "Welcome to the Certificate Manager Dashboard!"
+
+# Define a route for the dashboard
+@app.route('/dashboard/<env>')
+def display_dashboard(env):
+    try:
+        # Ensure certificate manager is called before displaying the dashboard
+        certificate_manager.check_certificates_for_environment(env)
+        
+        output_file_path = f'output/{env}_output.json'
+        if os.path.exists(output_file_path):
+            with open(output_file_path, 'r') as output_file:
+                cert_data = json.load(output_file)
+            return render_template('dashboard.html', env=env, certs=cert_data)
+        else:
+            return "Certificates not checked yet for this environment."
+    except Exception as e:
+        return f"Error displaying dashboard: {str(e)}"
+
+# Register the dashboard blueprint
+app.register_blueprint(dashboard_bp)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+**2. `certificate_manager.py` (Certificate Manager):**
+
+```python
+import json
 import ssl
 import socket
 import datetime
-import json
+import threading
+import time
+import os
+import logging
 
-def get_ssl_expiry_date(domain):
+# Configure logging
+logging.basicConfig(filename='certificate_manager.log', level=logging.ERROR,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Function to check SSL certificate expiration and capture additional info
+def check_certificate(cert_data):
     try:
+        endpoint = cert_data["endpoint"]
+        port = cert_data.get("port", 443)  # Default to 443 if port is not specified
+        
         context = ssl.create_default_context()
-        with socket.create_connection((domain, 443), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=domain) as ssock:
-                cert = ssock.getpeercert()
-                not_after_str = cert['notAfter']
-                not_after_date = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
-                return not_after_date
-    except (socket.gaierror, ConnectionRefusedError, ssl.CertificateError, TimeoutError) as e:
-        return None
+        with context.wrap_socket(socket.socket(socket.AF_INET), server_hostname=endpoint) as ssock:
+            ssock.connect((endpoint, port))
+            cert = ssock.getpeercert()
 
-def assign_rag_criteria(expiry_date):
-    if expiry_date is None:
-        return "Red"  # Unable to retrieve certificate or connection error
-    today = datetime.datetime.now()
-    delta = expiry_date - today
-    if delta.days < 7:
-        return "Red"  # Certificate expires in less than 7 days
-    elif delta.days < 30:
-        return "Amber"  # Certificate expires in less than 30 days
-    else:
-        return "Green"  # Certificate expires in more than 30 days
+            # Capture additional info
+            issuer_name = dict(cert['issuer'])['organizationName']
+            expiration_date = datetime.datetime.strptime(cert["notAfter"], '%b %d %H:%M:%S %Y %Z')
+            days_until_expiry = (expiration_date - datetime.datetime.now()).days
+            dns_aliases = cert.get('subjectAltName', [])
+            fqdns = [name for _, name in dns_aliases if name.startswith("DNS:")]
 
-def save_to_json(data, filename):
-    with open(filename, 'w') as json_file:
-        json.dump(data, json_file, indent=4)
+            result = {
+                "issuer_name": issuer_name,
+                "expiry_date": expiration_date.strftime('%Y-%m-%d %H:%M:%S'),
+                "days_until_expiry": days_until_expiry,
+                "dns_aliases": dns_aliases,
+                "fqdns": fqdns
+            }
+            return result
+    except Exception as e:
+        logging.error(f"Error checking certificate for {cert_data['name']}: {str(e)}")
+        return {
+            "issuer_name": "Certificate Error",
+            "expiry_date": "Certificate Error",
+            "days_until_expiry": -1,
+            "dns_aliases": [],
+            "fqdns": []
+        }
 
-urls = ["example.com", "google.com", "invalid.example"]  # Replace with the URLs you want to check
-results = {}
+# Function to check certificates for a specific environment
+def check_certificates_for_environment(env):
+    try:
+        with open(f'config/{env}.json', 'r') as config_file:
+            config_data = json.load(config_file)
 
-for url in urls:
-    expiry_date = get_ssl_expiry_date(url)
-    rag = assign_rag_criteria(expiry_date)
-    results[url] = {"expiry_date": str(expiry_date), "rag": rag}
+        results = {}
+        for cert in config_data["certificates"]:
+            cert_info = check_certificate(cert)
+            results[cert["name"]] = cert_info
 
-# Output results to a JSON file
-output_filename = "ssl_expiry_results.json"
-save_to_json(results, output_filename)
+        with open(f'output/{env}_output.json', 'w') as output_file:
+            json.dump(results, output_file, indent=4)
+    except FileNotFoundError:
+        logging.error(f"Configuration file for {env} not found.")
+    except Exception as e:
+        logging.error(f"Error processing {env}: {str(e)}")
 
-print(f"Results saved to {output_filename}")
+# Function to periodically check SSL certificates for all environments
+def certificate_checker():
+    while True:
+        server_env = os.getenv("SERVERENV")
+        if server_env:
+            check_certificates_for_environment(server_env)
+        else:
+            logging.error("SERVERENV environment variable not set.")
+
+        time.sleep(3600)  # Sleep for an hour before checking again
+
+# Start the certificate checker thread
+certificate_checker_thread = threading.Thread(target=certificate_checker)
+certificate_checker_thread.daemon = True
+certificate_checker_thread.start()
 ```
 
-This script defines functions for retrieving SSL certificate expiry, assigning RAG criteria, and saving results to a JSON file. It iterates through a list of URLs, handles exceptions, and stores the results in a JSON file. Adjust the `urls` list with the websites you want to check.
+**3. `dashboard.py` (Dashboard Blueprint):**
+
+```python
+from flask import Blueprint, render_template
+import os
+import json
+
+dashboard_bp = Blueprint('dashboard', __name__)
+
+@dashboard_bp.route('/dashboard/<env>')
+def display_dashboard(env):
+    try:
+        output_file_path = f'output/{env}_output.json'
+        if os.path.exists(output_file_path):
+            with open(output_file_path, 'r') as output_file:
+                cert_data = json.load(output_file)
+            return render_template('dashboard.html', env=env, certs=cert_data)
+        else:
+            return "Certificates not checked yet for this environment."
+    except Exception as e:
+        return f"Error displaying dashboard: {str(e)}"
+```
+
+This code structure allows you to run your Flask application with an integrated certificate manager and dashboard while maintaining modularity and separation of concerns.
