@@ -59,3 +59,19 @@ main() {
 }
 
 main "$@"
+
+#!/usr/bin/expect
+
+set timeout 20
+set keypath "~/.ssh/id_rsa"
+set old_passphrase "YOUR_OLD_PASSPHRASE_HERE"
+
+spawn ssh-keygen -p -m PEM -f $keypath
+expect "Enter old passphrase:"
+send "$old_passphrase\r"
+expect "Enter new passphrase (empty for no passphrase):"
+send "\r"
+expect "Enter same passphrase again:"
+send "\r"
+expect eof
+
