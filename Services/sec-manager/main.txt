@@ -1,312 +1,61 @@
-import os
-import json
-import logging
-import base64
-import psycopg2.pool
-from flask import Flask, request, jsonify
-from waitress import serve
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-import jsonschema
+#!/bin/bash
 
-# Initialize the Flask app
-app = Flask(__name__)
-limiter = Limiter(app, key_func=get_remote_address)
+# Variables
+SSH_FOLDER="$HOME/.ssh"
+PEM_FILENAME="$SSH_FOLDER/id_rsa_pub.pem"
+OUTPUT_PATH="/desired/output/path"  # Change this to your desired default output path
 
-# Initialize the logging configuration
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# JSON Schema for the configuration file
-CONFIG_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "whitelist": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "hostname": {"type": "string"},
-                    "process_name": {"type": "string"},
-                    "bucket_name": {"type": "string"}
-                },
-                "required": ["hostname", "process_name", "bucket_name"]
-            }
-        }
-    },
-    "required": ["whitelist"]
+check_arguments() {
+    if [ "$#" -ne 2 ]; then
+        echo "Usage: $0 <string_to_encrypt> <output_filename>"
+        exit 1
+    fi
 }
 
+ensure_output_path_exists() {
+    if [ ! -d "$OUTPUT_PATH" ]; then
+        mkdir -p "$OUTPUT_PATH"
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to create the output directory at $OUTPUT_PATH."
+            exit 2
+        fi
+    fi
+}
 
-# Function to initialize secrets from the database and create JSON files upon startup
-def initialize_secrets():
-    try:
-        with connection_pool.getconn() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT secret_id, bucket_name, secret_value FROM secrets;")
-                secrets = cursor.fetchall()
+generate_pem_file() {
+    if [ ! -f "$PEM_FILENAME" ]; then
+        if [ ! -f "$SSH_FOLDER/id_rsa.pub" ]; then
+            echo "Error: No id_rsa.pub file found in $SSH_FOLDER."
+            exit 3
+        fi
+        ssh-keygen -f "$SSH_FOLDER/id_rsa.pub" -e -m PKCS8 > "$PEM_FILENAME"
+    fi
+}
 
-        for secret in secrets:
-            secret_id = secret['secret_id']
-            bucket_name = secret['bucket_name']
-            secret_value = decrypt_secret(secret['secret_value'], ENCRYPTION_KEY)
+validate_pem_file() {
+    if [ ! -f "$PEM_FILENAME" ]; then
+        echo "Error: PEM file not found or failed to create."
+        exit 4
+    fi
+}
 
-            # Create a dictionary for each secret with the secret_id as the key
-            secret_data = {
-                'secret_id': secret_id,
-                'bucket_name': bucket_name,
-                'secret': secret_value
-            }
+encrypt_string() {
+    local STRING_TO_ENCRYPT="$1"
+    local OUTPUT_FILENAME="$2"
+    echo -n "$STRING_TO_ENCRYPT" | openssl rsautl -encrypt -pubin -inkey "$PEM_FILENAME" | base64 -w0 > "$OUTPUT_FILENAME"
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to encrypt the string."
+        exit 5
+    fi
+}
 
-            # Create a JSON file for the secret
-            file_path = os.path.join('secrets', bucket_name, f'secret_{secret_id}.json')
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w') as json_file:
-                json.dump(secret_data, json_file)
+main() {
+    check_arguments "$@"
+    ensure_output_path_exists
+    generate_pem_file
+    validate_pem_file
+    encrypt_string "$1" "$OUTPUT_PATH/$2"
+    echo "Encryption successful! Encrypted string written to $OUTPUT_PATH/$2."
+}
 
-        logging.info("Initialized secrets from the database.")
-    except Exception as e:
-        logging.error("Error initializing secrets: %s", e)
-
-
-# Load configuration from config.json
-def load_config():
-    try:
-        with open('config.json', 'r') as config_file:
-            config = json.load(config_file)
-            # Validate the configuration file against the JSON Schema
-            jsonschema.validate(config, CONFIG_SCHEMA)
-            return config
-    except Exception as e:
-        logging.error("Error loading or validating configuration: %s", e)
-        return None
-
-# Database connection pooling
-connection_pool = psycopg2.pool.ThreadedConnectionPool(5, 20,
-                                                      user='your_db_user',
-                                                      password='your_db_password',
-                                                      host='your_db_host',
-                                                      port='your_db_port',
-                                                      database='your_db_name')
-
-# Encrypt secret using base64 encoding
-def encrypt_secret(secret, key):
-    return base64.b64encode(secret.encode('utf-8'))
-
-# Decrypt secret using base64 decoding
-def decrypt_secret(encrypted_secret, key):
-    return base64.b64decode(encrypted_secret).decode('utf-8')
-
-# Function to check if the request is whitelisted
-def is_whitelisted(hostname, process_name, bucket_name, config):
-    whitelist = config.get('whitelist', [])
-    for entry in whitelist:
-        if entry.get('hostname') == hostname and entry.get('process_name') == process_name and entry.get('bucket_name') == bucket_name:
-            return True
-    return False
-
-# Function to fetch secrets from the database
-def fetch_secrets_from_database():
-    try:
-        with connection_pool.getconn() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT secret_id, bucket_name, secret_value FROM secrets;")
-                secrets = cursor.fetchall()
-        return secrets
-    except Exception as e:
-        logging.error("Error fetching secrets from the database: %s", e)
-        return []
-
-# Function to store secret in the database
-def store_secret_in_database(secret_id, bucket_name, encrypted_secret):
-    try:
-        with connection_pool.getconn() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO secrets (secret_id, bucket_name, secret_value) VALUES (%s, %s, %s);",
-                               (secret_id, bucket_name, encrypted_secret))
-            conn.commit()
-        return True
-    except Exception as e:
-        logging.error("Error storing secret in the database: %s", e)
-        return False
-
-# REST endpoints for CRUD operations
-@app.route('/secrets', methods=['GET'])
-@limiter.limit("10 per minute")
-def get_all_secrets():
-    try:
-        secrets = fetch_secrets_from_database()
-        secret_data_list = []
-        for secret in secrets:
-            secret_id = secret['secret_id']
-            bucket_name = secret['bucket_name']
-            secret_value = decrypt_secret(secret['secret_value'], ENCRYPTION_KEY)
-
-            # Create a dictionary for each secret with the secret_id as the key
-            secret_data = {
-                'secret_id': secret_id,
-                'bucket_name': bucket_name,
-                'secret': secret_value
-            }
-
-            secret_data_list.append(secret_data)
-
-        return jsonify(secret_data_list)
-    except Exception as e:
-        logging.error("Error fetching all secrets: %s", e)
-        return jsonify(error="Error fetching secrets"), 500
-
-@app.route('/secrets/<string:secret_id>', methods=['GET'])
-@limiter.limit("20 per minute")
-def get_secret(secret_id):
-    try:
-        with connection_pool.getconn() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT secret_id, bucket_name, secret_value FROM secrets WHERE secret_id = %s;", (secret_id,))
-                secret = cursor.fetchone()
-        if secret:
-            secret_id = secret['secret_id']
-            bucket_name = secret['bucket_name']
-            secret_value = decrypt_secret(secret['secret_value'], ENCRYPTION_KEY)
-
-            # Create a dictionary for the secret
-            secret_data = {
-                'secret_id': secret_id,
-                'bucket_name': bucket_name,
-                'secret': secret_value
-            }
-
-            return jsonify(secret_data)
-        else:
-            return jsonify(error="Secret not found"), 404
-    except Exception as e:
-        logging.error("Error fetching secret: %s", e)
-        return jsonify(error="Error fetching secret"), 500
-
-@app.route('/secrets', methods=['POST'])
-@limiter.limit("5 per minute")
-def create_secret():
-    try:
-        data = request.get_json()
-        secret_id = data.get('secret_id')
-        bucket_name = data.get('bucket_name')
-        secret_value = data.get('secret_value')
-
-        # Encrypt the secret value
-        encrypted_secret = encrypt_secret(secret_value, ENCRYPTION_KEY)
-
-        # Check if the request is whitelisted
-        config = load_config()
-        if is_whitelisted(request.host, data.get('process_name'), bucket_name, config):
-            with connection_pool.getconn() as conn:
-                with conn.cursor() as cursor:
-                    # Check for duplicate secret_id and bucket_name combination in the database
-                    cursor.execute("SELECT COUNT(*) FROM secrets WHERE secret_id = %s AND bucket_name = %s;",
-                                   (secret_id, bucket_name))
-                    count = cursor.fetchone()[0]
-                    if count > 0:
-                        return jsonify(error="Duplicate secret_id and bucket_name combination"), 400
-
-                    # Store the secret in the database
-                    cursor.execute("INSERT INTO secrets (secret_id, bucket_name, secret_value) VALUES (%s, %s, %s);",
-                                   (secret_id, bucket_name, encrypted_secret))
-                conn.commit()
-
-            # Create a dictionary for the new secret
-            secret_data = {
-                'secret_id': secret_id,
-                'bucket_name': bucket_name,
-                'secret': secret_value
-            }
-
-            # Create a JSON file for the new secret
-            file_path = os.path.join('secrets', bucket_name, f'secret_{secret_id}.json')
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w') as json_file:
-                json.dump(secret_data, json_file)
-
-            return jsonify(message="Secret created successfully")
-        else:
-            return jsonify(error="Request not whitelisted"), 403
-    except Exception as e:
-        logging.error("Error creating secret: %s", e)
-        return jsonify(error="Error creating secret"), 500
-
-@app.route('/secrets/<string:secret_id>', methods=['PUT'])
-@limiter.limit("5 per minute")
-def update_secret(secret_id):
-    try:
-        data = request.get_json()
-        bucket_name = data.get('bucket_name')
-        secret_value = data.get('secret_value')
-
-        # Encrypt the secret value
-        encrypted_secret = encrypt_secret(secret_value, ENCRYPTION_KEY)
-
-        # Check if the request is whitelisted
-        config = load_config()
-        if is_whitelisted(request.host, data.get('process_name'), bucket_name, config):
-            with connection_pool.getconn() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("UPDATE secrets SET secret_value = %s WHERE secret_id = %s AND bucket_name = %s;",
-                                   (encrypted_secret, secret_id, bucket_name))
-                conn.commit()
-
-            # Update the JSON file for the secret
-            file_path = os.path.join('secrets', bucket_name, f'secret_{secret_id}.json')
-            with open(file_path, 'r') as json_file:
-                secret_data = json.load(json_file)
-            secret_data['secret'] = secret_value
-            with open(file_path, 'w') as json_file:
-                json.dump(secret_data, json_file)
-
-            return jsonify(message="Secret updated successfully")
-        else:
-            return jsonify(error="Request not whitelisted"), 403
-    except Exception as e:
-        logging.error("Error updating secret: %s", e)
-        return jsonify(error="Error updating secret"), 500
-
-@app.route('/secrets/<string:secret_id>', methods=['DELETE'])
-@limiter.limit("5 per minute")
-def delete_secret(secret_id):
-    try:
-        data = request.get_json()
-        bucket_name = data.get('bucket_name')
-
-        # Check if the request is whitelisted
-        config = load_config()
-        if is_whitelisted(request.host, data.get('process_name'), bucket_name, config):
-            with connection_pool.getconn() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM secrets WHERE secret_id = %s AND bucket_name = %s;",
-                                   (secret_id, bucket_name))
-                conn.commit()
-
-            # Delete the JSON file for the secret
-            file_path = os.path.join('secrets', bucket_name, f'secret_{secret_id}.json')
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-            return jsonify(message="Secret deleted successfully")
-        else:
-            return jsonify(error="Request not whitelisted"), 403
-    except Exception as e:
-        logging.error("Error deleting secret: %s", e)
-        return jsonify(error="Error deleting secret"), 500
-
-if __name__ == '__main__':
-    try:
-        # Fetch secrets from the database and generate JSON files upon startup
-        initialize_secrets()
-
-        # Load JSON configuration file
-        config = load_config()
-
-        # Use Waitress to serve the Flask app
-        serve(app, host='127.0.0.1', port=7443, threads=4, url_scheme='https')
-    except Exception as e:
-        logging.error("An error occurred: %s", e)
-    finally:
-        # Close the database connection pool on exit
-        connection_pool.closeall()
-        logging.info("Database connections closed.")
+main "$@"
