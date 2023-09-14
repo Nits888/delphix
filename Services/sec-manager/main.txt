@@ -1,77 +1,14 @@
-#!/bin/bash
+def refresh_bucket_cache():
+    """
+    Refresh the bucket cache to ensure it contains all apps and buckets from the database.
+    """
+    # Step 1: Get the current list of apps and buckets from the database
+    current_buckets = cry_database.get_all_buckets()
 
-# Variables
-SSH_FOLDER="$HOME/.ssh"
-PEM_FILENAME="$SSH_FOLDER/id_rsa_pub.pem"
-OUTPUT_PATH="/desired/output/path"  # Change this to your desired default output path
-
-check_arguments() {
-    if [ "$#" -ne 2 ]; then
-        echo "Usage: $0 <string_to_encrypt> <output_filename>"
-        exit 1
-    fi
-}
-
-ensure_output_path_exists() {
-    if [ ! -d "$OUTPUT_PATH" ]; then
-        mkdir -p "$OUTPUT_PATH"
-        if [ $? -ne 0 ]; then
-            echo "Error: Failed to create the output directory at $OUTPUT_PATH."
-            exit 2
-        fi
-    fi
-}
-
-generate_pem_file() {
-    if [ ! -f "$PEM_FILENAME" ]; then
-        if [ ! -f "$SSH_FOLDER/id_rsa.pub" ]; then
-            echo "Error: No id_rsa.pub file found in $SSH_FOLDER."
-            exit 3
-        fi
-        ssh-keygen -f "$SSH_FOLDER/id_rsa.pub" -e -m PKCS8 > "$PEM_FILENAME"
-    fi
-}
-
-validate_pem_file() {
-    if [ ! -f "$PEM_FILENAME" ]; then
-        echo "Error: PEM file not found or failed to create."
-        exit 4
-    fi
-}
-
-encrypt_string() {
-    local STRING_TO_ENCRYPT="$1"
-    local OUTPUT_FILENAME="$2"
-    echo -n "$STRING_TO_ENCRYPT" | openssl rsautl -encrypt -pubin -inkey "$PEM_FILENAME" | base64 -w0 > "$OUTPUT_FILENAME"
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to encrypt the string."
-        exit 5
-    fi
-}
-
-main() {
-    check_arguments "$@"
-    ensure_output_path_exists
-    generate_pem_file
-    validate_pem_file
-    encrypt_string "$1" "$OUTPUT_PATH/$2"
-    echo "Encryption successful! Encrypted string written to $OUTPUT_PATH/$2."
-}
-
-main "$@"
-
-#!/usr/bin/expect
-
-set timeout 20
-set keypath "~/.ssh/id_rsa"
-set old_passphrase "YOUR_OLD_PASSPHRASE_HERE"
-
-spawn ssh-keygen -p -m PEM -f $keypath
-expect "Enter old passphrase:"
-send "$old_passphrase\r"
-expect "Enter new passphrase (empty for no passphrase):"
-send "\r"
-expect "Enter same passphrase again:"
-send "\r"
-expect eof
-
+    # Step 2: Compare it with the cache to identify any missing apps or buckets
+    for bucket in current_buckets:
+        app_name, bucket_name, _, client_id = bucket
+        if (app_name, bucket_name) not in bucket_cache:
+            # Step 3: Add the missing apps or buckets to the cache
+            bucket_cache[app_name, bucket_name] = {'client_id': client_id}
+            logging.info(f"Added missing app '{app_name}' and bucket '{bucket_name}' to the cache")
