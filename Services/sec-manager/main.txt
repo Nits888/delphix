@@ -1,4 +1,6 @@
+
 from flask import Flask, redirect, url_for, session, request
+import requests
 from keycloak import KeycloakOpenID
 
 app = Flask(__name__)
@@ -13,7 +15,8 @@ keycloak_openid = KeycloakOpenID(
 )
 
 # Fetch the .well-known configuration
-config_well_known = keycloak_openid.well_known()
+well_known_url = f"https://YOUR_KEYCLOAK_DOMAIN/auth/realms/YOUR_REALM/.well-known/openid-configuration"
+config_well_known = requests.get(well_known_url).json()
 
 @app.route('/')
 def home():
