@@ -1,35 +1,48 @@
-from flask import Flask, g
-from flask_oidc import OpenIDConnect
+from flask import Flask, redirect, url_for, session
+from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Change this to a secure random value
 
-app.config.update({
-    'SECRET_KEY': 'your-secret-key',
-    'OIDC_CLIENT_SECRETS': 'client_secrets.json',
-    'OIDC_COOKIE_SECURE': False,
-    'OIDC_CALLBACK_ROUTE': '/oidc/callback',
-    'OIDC_SCOPES': ['openid', 'email', 'profile'],
-    'OIDC_ID_TOKEN_COOKIE_NAME': 'oidc_token'
-})
-
-oidc = OpenIDConnect(app)
+# OAuth setup
+oauth = OAuth(app)
+keycloak = oauth.register(
+    name='keycloak',
+    client_id='YOUR_CLIENT_ID',
+    client_secret='YOUR_CLIENT_SECRET',  # This can be None for public clients
+    authorize_url='https://YOUR_KEYCLOAK_DOMAIN/auth/realms/YOUR_REALM/protocol/openid-connect/auth',
+    authorize_params=None,
+    access_token_url='https://YOUR_KEYCLOAK_DOMAIN/auth/realms/YOUR_REALM/protocol/openid-connect/token',
+    access_token_params=None,
+    refresh_token_url=None,
+    redirect_uri='http://localhost:5000/login/callback',
+    client_kwargs={'scope': 'openid profile email'},
+)
 
 @app.route('/')
-def hello_world():
-    if oidc.user_loggedin:
-        return 'Hello, {}!'.format(g.oidc_id_token['preferred_username'])
+def home():
+    user = session.get('user')
+    if user:
+        return f'Hello, {user["name"]}'
     else:
-        return 'Hello, Anonymous! <a href="/login">Login</a>'
+        return 'Not logged in'
 
 @app.route('/login')
-@oidc.require_login
 def login():
-    return 'Welcome, {}!'.format(g.oidc_id_token['preferred_username'])
+    redirect_uri = url_for('login_callback', _external=True)
+    return keycloak.authorize_redirect(redirect_uri)
+
+@app.route('/login/callback')
+def login_callback():
+    token = keycloak.authorize_access_token()
+    user = keycloak.parse_id_token(token)
+    session['user'] = user
+    return redirect('/')
 
 @app.route('/logout')
 def logout():
-    oidc.logout()
-    return 'Logged out! <a href="/">Return</a>'
+    session.pop('user', None)
+    return redirect('/')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
