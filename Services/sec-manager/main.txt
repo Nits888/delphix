@@ -34,11 +34,8 @@ def login():
 def login_callback():
     code = request.args.get('code')
     token_endpoint = well_known_config['token_endpoint']
-    userinfo_endpoint = well_known_config['userinfo_endpoint']
-    
     token_response = keycloak_openid.token(code=code, token_url=token_endpoint, redirect_uri=url_for('login_callback', _external=True))
-    user_info = keycloak_openid.userinfo(token=token_response['access_token'], userinfo_url=userinfo_endpoint)
-    
+    user_info = keycloak_openid.userinfo(token_response['access_token'])
     session['user'] = user_info
     return redirect('/')
 
