@@ -1,23 +1,19 @@
-from flask import Flask, redirect, url_for, session
-from authlib.integrations.flask_client import OAuth
+from flask import Flask, redirect, url_for, session, request
+from keycloak import KeycloakOpenID
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a secure random value
 
-# OAuth setup
-oauth = OAuth(app)
-keycloak = oauth.register(
-    name='keycloak',
-    client_id='YOUR_CLIENT_ID',
-    client_secret='YOUR_CLIENT_SECRET',  # This can be None for public clients
-    authorize_url='https://YOUR_KEYCLOAK_DOMAIN/auth/realms/YOUR_REALM/protocol/openid-connect/auth',
-    authorize_params=None,
-    access_token_url='https://YOUR_KEYCLOAK_DOMAIN/auth/realms/YOUR_REALM/protocol/openid-connect/token',
-    access_token_params=None,
-    refresh_token_url=None,
-    redirect_uri='http://localhost:5000/login/callback',
-    client_kwargs={'scope': 'openid profile email'},
+# Keycloak setup
+keycloak_openid = KeycloakOpenID(
+    server_url="https://YOUR_KEYCLOAK_DOMAIN/auth/",
+    client_id="YOUR_CLIENT_ID",
+    realm_name="YOUR_REALM",
+    client_secret_key="YOUR_CLIENT_SECRET",  # This can be None for public clients
 )
+
+# Fetch the .well-known configuration
+config_well_known = keycloak_openid.well_known()
 
 @app.route('/')
 def home():
@@ -30,13 +26,15 @@ def home():
 @app.route('/login')
 def login():
     redirect_uri = url_for('login_callback', _external=True)
-    return keycloak.authorize_redirect(redirect_uri)
+    auth_url = keycloak_openid.auth_url(redirect_uri=redirect_uri)
+    return redirect(auth_url)
 
 @app.route('/login/callback')
 def login_callback():
-    token = keycloak.authorize_access_token()
-    user = keycloak.parse_id_token(token)
-    session['user'] = user
+    code = request.args.get('code')
+    token_response = keycloak_openid.token(code=code, redirect_uri=url_for('login_callback', _external=True))
+    user_info = keycloak_openid.userinfo(token_response['access_token'])
+    session['user'] = user_info
     return redirect('/')
 
 @app.route('/logout')
