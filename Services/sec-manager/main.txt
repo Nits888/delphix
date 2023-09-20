@@ -1,48 +1,50 @@
-from flask import Flask, redirect, url_for, session, request
-import requests
-from keycloak import KeycloakOpenID
+import socket
 
-app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Change this to a secure random value
+def ip_whitelist_required(f):
+    """Decorator to check if the incoming IP is whitelisted.
 
-# Keycloak setup
-keycloak_openid = KeycloakOpenID(
-    server_url="https://YOUR_KEYCLOAK_DOMAIN/auth/",
-    client_id="YOUR_CLIENT_ID",
-    realm_name="YOUR_REALM",
-    client_secret_key="YOUR_CLIENT_SECRET",  # This can be None for public clients
-)
+     Args:
+         f (function): The function to be decorated.
 
-# Fetch the .well-known configuration
-well_known_config = keycloak_openid.well_known()
+     Returns:
+         function: The decorated function.
+     """
 
-@app.route('/')
-def home():
-    user = session.get('user')
-    if user:
-        return f'Hello, {user["name"]}'
-    else:
-        return 'Not logged in'
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Retrieve the client IP from the X-Real-IP header
+        incoming_ip = request.headers.get('X-Real-IP', request.remote_addr)
+        bucket_config = get_bucket_config(g.bucket_name, g.app_name)
+        allowed_entries = bucket_config.get("allowed_ips", [])
 
-@app.route('/login')
-def login():
-    redirect_uri = url_for('login_callback', _external=True)
-    auth_url = keycloak_openid.auth_url(redirect_uri=redirect_uri)
-    return redirect(auth_url)
+        # Resolve allowed hostnames to IPs
+        allowed_ips = []
+        for entry in allowed_entries:
+            if is_valid_ip(entry):
+                allowed_ips.append(entry)
+            else:
+                try:
+                    resolved_ips = socket.gethostbyname_ex(entry)[2]
+                    allowed_ips.extend(resolved_ips)
+                except socket.gaierror:
+                    logging.error(f"Failed to resolve IP for hostname: {entry}")
 
-@app.route('/login/callback')
-def login_callback():
-    code = request.args.get('code')
-    token_endpoint = well_known_config['token_endpoint']
-    token_response = keycloak_openid.token(code=code, token_url=token_endpoint, redirect_uri=url_for('login_callback', _external=True))
-    user_info = keycloak_openid.userinfo(token_response['access_token'])
-    session['user'] = user_info
-    return redirect('/')
+        # If "ANY" is in the allowed_ips list or the incoming IP is in the allowed_ips list, allow the request
+        if "ANY" in allowed_ips:
+            logging.info(f"IP address {incoming_ip} allowed due to 'ANY' in whitelist for bucket {g.bucket_name}.")
+            return f(*args, **kwargs)
+        elif incoming_ip in allowed_ips:
+            return f(*args, **kwargs)
 
-@app.route('/logout')
-def logout():
-    session.pop('user', None)
-    return redirect('/')
+        logging.warning(f"Unauthorized IP address attempt: {incoming_ip} for bucket {g.bucket_name}.")
+        return {'error': 'Unauthorized IP address'}, 403  # Return the dictionary directly
 
-if __name__ == '__main__':
-    app.run()
+    return decorated_function
+
+def is_valid_ip(address):
+    """Check if the address is a valid IP."""
+    try:
+        socket.inet_aton(address)
+        return True
+    except socket.error:
+        return False
