@@ -1,50 +1,53 @@
-import socket
+**Engineering Award Nomination: Innovative Application Hosting Platform**
 
-def ip_whitelist_required(f):
-    """Decorator to check if the incoming IP is whitelisted.
+---
 
-     Args:
-         f (function): The function to be decorated.
+**Nominee:** [Your Name]
 
-     Returns:
-         function: The decorated function.
-     """
+**Platform Name:** [Platform's Name]
 
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Retrieve the client IP from the X-Real-IP header
-        incoming_ip = request.headers.get('X-Real-IP', request.remote_addr)
-        bucket_config = get_bucket_config(g.bucket_name, g.app_name)
-        allowed_entries = bucket_config.get("allowed_ips", [])
+---
 
-        # Resolve allowed hostnames to IPs
-        allowed_ips = []
-        for entry in allowed_entries:
-            if is_valid_ip(entry):
-                allowed_ips.append(entry)
-            else:
-                try:
-                    resolved_ips = socket.gethostbyname_ex(entry)[2]
-                    allowed_ips.extend(resolved_ips)
-                except socket.gaierror:
-                    logging.error(f"Failed to resolve IP for hostname: {entry}")
+**Introduction:**
 
-        # If "ANY" is in the allowed_ips list or the incoming IP is in the allowed_ips list, allow the request
-        if "ANY" in allowed_ips:
-            logging.info(f"IP address {incoming_ip} allowed due to 'ANY' in whitelist for bucket {g.bucket_name}.")
-            return f(*args, **kwargs)
-        elif incoming_ip in allowed_ips:
-            return f(*args, **kwargs)
+[Your Name]'s innovative application hosting platform stands as a testament to the evolving nature of engineering. From humble beginnings, where it hosted just 2 applications, it has now burgeoned to support over 8 apps, all while defining a new standard for application development and hosting.
 
-        logging.warning(f"Unauthorized IP address attempt: {incoming_ip} for bucket {g.bucket_name}.")
-        return {'error': 'Unauthorized IP address'}, 403  # Return the dictionary directly
+---
 
-    return decorated_function
+**Evolutionary Growth:**
 
-def is_valid_ip(address):
-    """Check if the address is a valid IP."""
-    try:
-        socket.inet_aton(address)
-        return True
-    except socket.error:
-        return False
+The platform's adaptive and evolutionary approach has been instrumental in addressing varying business needs. As the number of hosted apps increased, so did the platform’s robustness, scalability, and adaptability.
+
+---
+
+**Environmentally Conscious:**
+
+In an era where sustainability is paramount, [Your Name]'s platform is taking commendable strides towards environmental responsibility. With an impending upgrade, the platform is set to achieve Netzero carbon emission, making it not just technologically superior but also greener.
+
+---
+
+**Reliability and Performance:**
+
+What sets this platform apart is its unparalleled reliability. It has showcased an impeccable record by ensuring zero critical downtimes or major incidents. This sort of dependability ensures businesses can function seamlessly, without the worry of technological setbacks.
+
+---
+
+**State-of-the-Art Technology:**
+
+The platform is a haven for modern technology enthusiasts. It supports the latest recommended technology stacks, offering developers the tools they need to create cutting-edge applications. Moreover, its built-in fully automated Continuous Integration and Continuous Deployment (CI/CD) capabilities make the development process streamlined and efficient.
+
+---
+
+**Cost-Effective and Speedy Deployment:**
+
+By leveraging dedicated shared hosting, the platform not only economizes the hosting costs but also significantly reduces the time-to-market for applications. This dual advantage ensures businesses can go live faster while staying cost-effective.
+
+---
+
+**Conclusion:**
+
+[Your Name]'s application hosting platform is more than just a technological marvel; it's an embodiment of visionary engineering. As it continues to shape the future of application hosting, it truly deserves recognition for its unmatched innovation, reliability, and commitment to sustainability.
+
+---
+
+I recommend you fill in the placeholders "[Your Name]" and "[Platform's Name]" with the appropriate details before submitting the nomination.
