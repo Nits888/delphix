@@ -1,63 +1,28 @@
-import os
-import json
-import logging
-import re
-from jsonschema import validate, ValidationError, exceptions
+def refresh_token(refresh_token):
+    try:
+        new_tokens = keycloak_openid.refresh_token(refresh_token)
+        session['access_token'] = new_tokens['access_token']
+        session['refresh_token'] = new_tokens['refresh_token']
+        return new_tokens['access_token']
+    except:
+        logging.warning("Failed to refresh the token.")
+        return None
 
-# Custom validator for hostname
-def is_valid_hostname(hostname):
-    if len(hostname) > 255:
-        return False
-    if hostname[-1] == ".":
-        hostname = hostname[:-1]  # strip trailing dot
-    allowed = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
-    return all(allowed.match(x) for x in hostname.split("."))
+except Exception as e:
+    logging.warning(f"Failed to decode user info from token: {str(e)}")
+    refreshed_successfully = False
 
-# Extend jsonschema with custom hostname validator
-def extended_validate(instance, schema):
-    validate(instance=instance, schema=schema)
-    if "allowed_ips" in instance:
-        for ip_or_hostname in instance["allowed_ips"]:
-            if ip_or_hostname == "ANY":
-                continue
-            if not (re.match(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", ip_or_hostname) or is_valid_hostname(ip_or_hostname)):
-                raise exceptions.ValidationError(f"'{ip_or_hostname}' is not a valid IP, hostname, or the value 'ANY'")
-
-def get_bucket_config(bucket_name, app_name):
-    """
-    Load the bucket-specific configuration by searching through the 'config' directory and its subdirectories.
-
-    Args:
-        bucket_name (str): The name of the bucket.
-        app_name (str): Application Name for the Bucket.
-
-    Returns:
-        dict: Configuration data for the bucket or None if not found.
-    """
-    config_dir = os.path.join('config', server_env, app_name)
-    for root, dirs, files in os.walk(config_dir):
-        if f"{bucket_name}.json" in files:
-            config_path = os.path.join(root, f"{bucket_name}.json")
+    # Attempt to refresh the token if a refresh token exists in the session
+    refresh_token_from_session = session.get('refresh_token')
+    if refresh_token_from_session:
+        new_access_token = refresh_token(refresh_token_from_session)
+        if new_access_token:
             try:
-                with open(config_path, 'r') as config_file:
-                    config = json.load(config_file)
-                
-                # Load and validate the config using the schema
-                with open('bucket_config_schema.json', 'r') as schema_file:
-                    schema = json.load(schema_file)
-                extended_validate(instance=config, schema=schema)
+                user_info = keycloak_openid.decode_token(new_access_token)
+                user_name = user_info.get('name', "Stranger")
+                refreshed_successfully = True
+            except Exception as decode_error:
+                logging.warning(f"Failed to decode user info from refreshed token: {str(decode_error)}")
 
-                # Ensure the file name matches the bucket_name
-                if config["bucket_name"] != bucket_name:
-                    logging.error(f"Bucket name mismatch in {config_path}")
-                    return None
-
-                return config
-            except ValidationError as ve:
-                logging.error(f"JSON Schema validation failed for {config_path}: {str(ve)}")
-                return None
-            except Exception as e:
-                logging.error(f"Error reading or parsing config file {config_path}: {str(e)}")
-                return None
-
-    return None
+    if not refreshed_successfully:
+        login_required = True
