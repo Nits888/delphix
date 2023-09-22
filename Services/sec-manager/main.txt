@@ -1,53 +1,75 @@
-**Engineering Award Nomination: Innovative Application Hosting Platform**
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "bucket_name": {
+      "type": "string"
+    },
+    "allowed_ips": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "hostname"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "ipv4"
+          }
+        },
+        {
+          "type": "string",
+          "enum": ["ANY"]
+        }
+      ]
+    },
+    "owner_email": {
+      "type": "string",
+      "format": "email"
+    }
+  },
+  "required": ["bucket_name", "allowed_ips", "owner_email"]
+}
 
----
+def get_bucket_config(bucket_name, app_name):
+    """
+    Load the bucket-specific configuration by searching through the 'config' directory and its subdirectories.
 
-**Nominee:** [Your Name]
+    Args:
+        bucket_name (str): The name of the bucket.
+        app_name (str): Application Name for the Bucket.
 
-**Platform Name:** [Platform's Name]
+    Returns:
+        dict: Configuration data for the bucket or None if not found.
+    """
+    config_dir = os.path.join('config', server_env, app_name)
+    for root, dirs, files in os.walk(config_dir):
+        if f"{bucket_name}.json" in files:
+            config_path = os.path.join(root, f"{bucket_name}.json")
+            try:
+                with open(config_path, 'r') as config_file:
+                    config = json.load(config_file)
+                
+                # Validate the config using the schema
+                with open('bucket_config_schema.json', 'r') as schema_file:
+                    schema = json.load(schema_file)
+                validate(instance=config, schema=schema)
 
----
+                # Ensure the file name matches the bucket_name
+                if config["bucket_name"] != bucket_name:
+                    logging.error(f"Bucket name mismatch in {config_path}")
+                    return None
 
-**Introduction:**
+                return config
+            except ValidationError as ve:
+                logging.error(f"JSON Schema validation failed for {config_path}: {str(ve)}")
+                return None
+            except Exception as e:
+                logging.error(f"Error reading or parsing config file {config_path}: {str(e)}")
+                return None
 
-[Your Name]'s innovative application hosting platform stands as a testament to the evolving nature of engineering. From humble beginnings, where it hosted just 2 applications, it has now burgeoned to support over 8 apps, all while defining a new standard for application development and hosting.
-
----
-
-**Evolutionary Growth:**
-
-The platform's adaptive and evolutionary approach has been instrumental in addressing varying business needs. As the number of hosted apps increased, so did the platform’s robustness, scalability, and adaptability.
-
----
-
-**Environmentally Conscious:**
-
-In an era where sustainability is paramount, [Your Name]'s platform is taking commendable strides towards environmental responsibility. With an impending upgrade, the platform is set to achieve Netzero carbon emission, making it not just technologically superior but also greener.
-
----
-
-**Reliability and Performance:**
-
-What sets this platform apart is its unparalleled reliability. It has showcased an impeccable record by ensuring zero critical downtimes or major incidents. This sort of dependability ensures businesses can function seamlessly, without the worry of technological setbacks.
-
----
-
-**State-of-the-Art Technology:**
-
-The platform is a haven for modern technology enthusiasts. It supports the latest recommended technology stacks, offering developers the tools they need to create cutting-edge applications. Moreover, its built-in fully automated Continuous Integration and Continuous Deployment (CI/CD) capabilities make the development process streamlined and efficient.
-
----
-
-**Cost-Effective and Speedy Deployment:**
-
-By leveraging dedicated shared hosting, the platform not only economizes the hosting costs but also significantly reduces the time-to-market for applications. This dual advantage ensures businesses can go live faster while staying cost-effective.
-
----
-
-**Conclusion:**
-
-[Your Name]'s application hosting platform is more than just a technological marvel; it's an embodiment of visionary engineering. As it continues to shape the future of application hosting, it truly deserves recognition for its unmatched innovation, reliability, and commitment to sustainability.
-
----
-
-I recommend you fill in the placeholders "[Your Name]" and "[Platform's Name]" with the appropriate details before submitting the nomination.
+    return None
