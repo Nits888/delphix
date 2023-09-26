@@ -75,3 +75,87 @@ Certainly! Here's a list of features for the new version of your Secrets Manager
     - Implemented a custom ordering function for the API endpoints.
 
 These features collectively provide a comprehensive secret management solution with secure authentication, data encryption, synchronization, and API documentation.
+
+
+Absolutely, you can document all these features in your Sphinx documentation. Here's how you can structure and articulate this information:
+
+1. **Introduction**:
+   - Briefly introduce the Secrets Manager application and its purpose.
+
+2. **Features Overview**:
+   - Create a section that provides an overview of the key features of the application.
+
+3. **Application Structure**:
+   - Describe the structure of your Flask application and how routes are organized in the `routes` folder.
+
+4. **Authentication with Keycloak**:
+   - Explain how you've implemented Keycloak authentication for securing your API endpoints.
+   - Describe the usage of the `auth.py` file for authentication logic.
+   - Mention the integration of the `flask_oidc` extension and the `requires_auth` decorator.
+
+5. **Bucket and Secret Management**:
+   - Detail the CRUD operations available for managing buckets and secrets.
+   - Describe the APIs for creating, listing, updating, and deleting buckets.
+   - Explain how secrets can be created, listed, updated, retrieved, and deleted within buckets.
+   - Document the ability to generate random secrets.
+
+6. **Data Encryption and Decryption**:
+   - Describe how you've implemented encryption and decryption of secret data.
+   - Explain the use of symmetric encryption for secure data storage.
+
+7. **Password Generation**:
+   - Detail the API for generating random passwords of a specified length.
+
+8. **Swagger Documentation**:
+   - Explain how you've integrated Swagger UI for API documentation.
+   - Provide instructions on how users can access the documentation through the `/swagger/` route.
+
+9. **Custom JSON Encoder**:
+   - Describe the implementation of a custom JSON encoder to handle byte conversion.
+
+10. **Synchronization Loop**:
+    - Explain the synchronization loop that retrieves data from the database periodically.
+    - Describe how the loop runs in a separate thread.
+
+11. **Dynamic Client ID and Secret for Buckets**:
+    - Document the process of generating a client ID during bucket creation and saving it to the database.
+    - Explain how the client secret is obtained using OIDC token authentication.
+
+12. **OIDC Token Authentication for Bucket Actions**:
+    - Detail the `authorize` endpoint for providing OIDC tokens.
+    - Explain the requirement for token authentication for specific actions on secrets.
+
+13. **Home Page and Buckets Listing**:
+    - Document the home page that lists all buckets and their associated secrets.
+
+14. **Password Encryption**:
+    - Describe the implementation of password encryption for secure storage.
+
+15. **HTML Templates**:
+    - Explain how you've created HTML templates for rendering pages.
+
+16. **Logging**:
+    - Document the usage of logging for event and error tracking.
+
+17. **Separate Initialization Logic**:
+    - Explain how the application is initialized using the `cry_initialize` module.
+
+18. **Threaded Synchronization**:
+    - Document the usage of separate threads for running the synchronization loop.
+
+19. **Environmental Configuration**:
+    - Detail the use of environmental variables for configuration.
+
+20. **Static File Serving**:
+    - Explain how you serve static files for documentation.
+
+21. **Documentation Route**:
+    - Document the route for rendering the Sphinx-generated documentation.
+
+22. **Custom Ordering of Endpoints**:
+    - Detail the custom ordering function for API endpoints.
+
+23. **Conclusion**:
+    - Summarize the capabilities of the Secrets Manager application and its features.
+
+By structuring the documentation this way, readers will have a clear understanding of the application's capabilities and how to utilize its features effectively. You can also provide code examples, configuration instructions, and any other relevant details to make the documentation comprehensive and user-friendly.
