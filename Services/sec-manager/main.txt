@@ -19,7 +19,7 @@ def generate_vibrant_paas_slide():
     p.font.color.rgb = RGBColor(0, 112, 192)  # Deep blue
 
     # Adding subtitle manually
-    subtitle_shape = slide.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(1))
+    subtitle_shape = slide.shapes.add_textbox(Inches(0.5), Inches(1.8), Inches(9), Inches(1))
     subtitle_frame = subtitle_shape.text_frame
     subtitle_frame.clear()
     p = subtitle_frame.add_paragraph()
@@ -27,7 +27,37 @@ def generate_vibrant_paas_slide():
     p.font.size = Pt(32)
     p.font.color.rgb = RGBColor(237, 125, 49)  # Vibrant orange
 
-    # ... [Rest of the code remains unchanged]
+    # Central Circle Graphic
+    ellipse = slide.shapes.add_shape(
+        9,  # Corresponds to an oval shape
+        Inches(2.5), Inches(3), Inches(5), Inches(5)
+    )
+    ellipse.fill.solid()
+    ellipse.fill.fore_color.rgb = RGBColor(91, 155, 213)  # Blue
+    ellipse.line.width = Pt(2.5)
+    ellipse.line.color.rgb = RGBColor(237, 125, 49)  # Vibrant orange
+
+    # Placeholder icons/texts
+    icon_offset = Inches(1)
+    icon_font_size = Pt(24)
+    positions = [
+        (Inches(1), Inches(2), "Automation"),
+        (Inches(7.5), Inches(2), "Tech Stack"),
+        (Inches(1), Inches(6.5), "Sustainability"),
+        (Inches(7.5), Inches(6.5), "Upgrade Soon!")
+    ]
+    for pos in positions:
+        icon_placeholder = slide.shapes.add_textbox(pos[0], pos[1], Inches(3), Inches(1))
+        icon_placeholder.text = pos[2]
+        icon_placeholder.text_frame.paragraphs[0].font.size = icon_font_size
+        icon_placeholder.text_frame.paragraphs[0].font.color.rgb = RGBColor(255, 0, 0)  # Red
+
+    # Apps listing at the bottom
+    app_width = Inches(1)
+    for i, app_name in enumerate(["App1", "App2", "App3", "App4", "App5", "App6", "App7", "App8", "App9", "App10"]):
+        app_placeholder = slide.shapes.add_textbox(Inches(0.5 + (i * app_width)), Inches(7.5), app_width, Inches(0.5))
+        app_placeholder.text = app_name
+        app_placeholder.text_frame.paragraphs[0].font.color.rgb = RGBColor(0, 112, 192)  # Deep blue
 
     prs.save('vibrant_paas_presentation.pptx')
 
