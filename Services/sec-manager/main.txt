@@ -1,5 +1,6 @@
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
 
 def generate_vibrant_paas_slide():
     prs = Presentation()
@@ -11,21 +12,21 @@ def generate_vibrant_paas_slide():
     title_shape.text = "Our PaaS Offering"
     title_shape.text_frame.paragraphs[0].font.size = Pt(44)
     title_shape.text_frame.paragraphs[0].font.bold = True
-    title_shape.text_frame.paragraphs[0].font.color.rgb = (0, 112, 192)  # Deep blue
+    title_shape.text_frame.paragraphs[0].font.color.rgb = RGBColor(0, 112, 192)  # Deep blue
     
     subtitle = slide.placeholders[1]
     subtitle.text = "Powering 10 Leading Applications"
     subtitle.text_frame.paragraphs[0].font.size = Pt(32)
-    subtitle.text_frame.paragraphs[0].font.color.rgb = (237, 125, 49)  # Vibrant orange
+    subtitle.text_frame.paragraphs[0].font.color.rgb = RGBColor(237, 125, 49)  # Vibrant orange
 
     ellipse = slide.shapes.add_shape(
         9,  # Corresponds to an oval shape
         Inches(2.5), Inches(2), Inches(5), Inches(5)
     )
     ellipse.fill.solid()
-    ellipse.fill.fore_color.rgb = (91, 155, 213)  # Blue
+    ellipse.fill.fore_color.rgb = RGBColor(91, 155, 213)  # Blue
     ellipse.line.width = Pt(2.5)
-    ellipse.line.color.rgb = (237, 125, 49)  # Vibrant orange
+    ellipse.line.color.rgb = RGBColor(237, 125, 49)  # Vibrant orange
 
     icon_offset = Inches(1)
     icon_font_size = Pt(24)
@@ -39,12 +40,12 @@ def generate_vibrant_paas_slide():
         icon_placeholder = slide.shapes.add_textbox(pos[0], pos[1], Inches(2.5), Inches(1))
         icon_placeholder.text = pos[2]
         icon_placeholder.text_frame.paragraphs[0].font.size = icon_font_size
-        icon_placeholder.text_frame.paragraphs[0].font.color.rgb = (255, 0, 0)  # Red
+        icon_placeholder.text_frame.paragraphs[0].font.color.rgb = RGBColor(255, 0, 0)  # Red
 
     for i, app_name in enumerate(["App1", "App2", "App3", "App4", "App5", "App6", "App7", "App8", "App9", "App10"]):
         app_placeholder = slide.shapes.add_textbox(Inches(i), Inches(6.5), Inches(1), Inches(0.5))
         app_placeholder.text = app_name
-        app_placeholder.text_frame.paragraphs[0].font.color.rgb = (0, 112, 192)  # Deep blue
+        app_placeholder.text_frame.paragraphs[0].font.color.rgb = RGBColor(0, 112, 192)  # Deep blue
 
     prs.save('vibrant_paas_presentation.pptx')
 
