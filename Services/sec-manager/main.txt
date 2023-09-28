@@ -1,61 +1,51 @@
 from pptx import Presentation
 from pptx.util import Inches, Pt
-from pptx.enum.shapes import MSO_SHAPE
-from pptx.dml.color import RGB
 
 def generate_vibrant_paas_slide():
-    # Create a new presentation object
     prs = Presentation()
 
-    # Add a slide layout
     slide_layout = prs.slide_layouts[5]  # blank slide
     slide = prs.slides.add_slide(slide_layout)
 
-    # Title and Subtitle
     title_shape = slide.shapes.title
     title_shape.text = "Our PaaS Offering"
     title_shape.text_frame.paragraphs[0].font.size = Pt(44)
     title_shape.text_frame.paragraphs[0].font.bold = True
-    title_shape.text_frame.paragraphs[0].font.color.rgb = RGB(0, 112, 192)  # Deep blue
+    title_shape.text_frame.paragraphs[0].font.color.rgb = (0, 112, 192)  # Deep blue
     
     subtitle = slide.placeholders[1]
     subtitle.text = "Powering 10 Leading Applications"
     subtitle.text_frame.paragraphs[0].font.size = Pt(32)
-    subtitle.text_frame.paragraphs[0].font.color.rgb = RGB(237, 125, 49)  # Vibrant orange
+    subtitle.text_frame.paragraphs[0].font.color.rgb = (237, 125, 49)  # Vibrant orange
 
-    # Central Circle Graphic (placeholder for the pie chart)
-    left_inch = Inches(2.5)
-    top_inch = Inches(2)
-    width = Inches(5)
-    height = Inches(5)
-    ellipse = slide.shapes.add_shape(MSO_SHAPE.OVAL, left_inch, top_inch, width, height)
+    ellipse = slide.shapes.add_shape(
+        9,  # Corresponds to an oval shape
+        Inches(2.5), Inches(2), Inches(5), Inches(5)
+    )
     ellipse.fill.solid()
-    ellipse.fill.fore_color.rgb = RGB(91, 155, 213)  # Blue
+    ellipse.fill.fore_color.rgb = (91, 155, 213)  # Blue
     ellipse.line.width = Pt(2.5)
-    ellipse.line.color.rgb = RGB(237, 125, 49)  # Vibrant orange
+    ellipse.line.color.rgb = (237, 125, 49)  # Vibrant orange
 
-    # Icons placeholder (as text for this demo; replace with actual icons in practice)
     icon_offset = Inches(1)
     icon_font_size = Pt(24)
     positions = [
-        (left_inch + width / 2, top_inch - icon_offset, "Automation"),
-        (left_inch + width, top_inch + height / 2, "Tech Stack"),
-        (left_inch + width / 2, top_inch + height, "Sustainability"),
-        (left_inch - icon_offset, top_inch + height / 2, "Upgrade Soon!")
+        (Inches(5), Inches(1.5), "Automation"),
+        (Inches(7.5), Inches(4.5), "Tech Stack"),
+        (Inches(5), Inches(7.5), "Sustainability"),
+        (Inches(2.5), Inches(4.5), "Upgrade Soon!")
     ]
     for pos in positions:
-        icon_placeholder = slide.shapes.add_textbox(pos[0], pos[1], width, icon_offset)
+        icon_placeholder = slide.shapes.add_textbox(pos[0], pos[1], Inches(2.5), Inches(1))
         icon_placeholder.text = pos[2]
         icon_placeholder.text_frame.paragraphs[0].font.size = icon_font_size
-        icon_placeholder.text_frame.paragraphs[0].font.color.rgb = RGB(255, 0, 0)  # Red
+        icon_placeholder.text_frame.paragraphs[0].font.color.rgb = (255, 0, 0)  # Red
 
-    # Footer with app logos (placeholders as text for this demo)
     for i, app_name in enumerate(["App1", "App2", "App3", "App4", "App5", "App6", "App7", "App8", "App9", "App10"]):
         app_placeholder = slide.shapes.add_textbox(Inches(i), Inches(6.5), Inches(1), Inches(0.5))
         app_placeholder.text = app_name
-        app_placeholder.text_frame.paragraphs[0].font.color.rgb = RGB(0, 112, 192)  # Deep blue
+        app_placeholder.text_frame.paragraphs[0].font.color.rgb = (0, 112, 192)  # Deep blue
 
-    # Save the slide
     prs.save('vibrant_paas_presentation.pptx')
 
 generate_vibrant_paas_slide()
